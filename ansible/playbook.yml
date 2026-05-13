@@ -7,7 +7,7 @@
     aws_region: us-east-1
     ecr_registry: "767398024557.dkr.ecr.us-east-1.amazonaws.com"
     image_name: "767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server"
-    image_tag: "latest"
+    image_tag: "v1.0.0"
     s3_bucket: "minecraft-world-767398024557"
     data_dir: /opt/minecraft/data
 
@@ -59,6 +59,15 @@
         aws s3 ls s3://{{ s3_bucket }}/world.tar.gz && \
         aws s3 cp s3://{{ s3_bucket }}/world.tar.gz /tmp/world.tar.gz && \
         tar -xzf /tmp/world.tar.gz -C {{ data_dir }} || true
+      args:
+        executable: /bin/bash
+
+    - name: Back up world data to S3
+      shell: |
+        if [ -d "{{ data_dir }}/world" ]; then
+          tar -czf /tmp/world.tar.gz -C {{ data_dir }} world
+          aws s3 cp /tmp/world.tar.gz s3://{{ s3_bucket }}/world.tar.gz
+        fi
       args:
         executable: /bin/bash
 

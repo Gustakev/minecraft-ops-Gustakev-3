@@ -1,0 +1,42 @@
+name: Publish Minecraft Image to ECR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull, tag, and push image
+        run: |
+          docker pull itzg/minecraft-server:latest
+          docker tag itzg/minecraft-server:latest 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:latest
+          docker tag itzg/minecraft-server:latest 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:${{ github.ref_name }}
+          docker push 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:latest
+          docker push 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:${{ github.ref_name }}
+
+      - name: Smoke test
+        run: |
+          docker run -d --name mc-test -e EULA=TRUE 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:latest
+          for i in $(seq 1 12); do
+            sleep 10
+            docker logs mc-test 2>&1 | grep -q "Done" && echo "Server started successfully" && exit 0
+          done
+          echo "Server failed to start" && docker logs mc-test && exit 1

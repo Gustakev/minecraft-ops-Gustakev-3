@@ -1,0 +1,78 @@
+---
+- name: Configure Minecraft server
+  hosts: minecraft
+  become: true
+
+  vars:
+    aws_region: us-east-1
+    ecr_registry: "767398024557.dkr.ecr.us-east-1.amazonaws.com"
+    image_name: "767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server"
+    image_tag: "latest"
+    s3_bucket: "minecraft-world-767398024557"
+    data_dir: /opt/minecraft/data
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - unzip
+          - curl
+        state: present
+        update_cache: true
+
+    - name: Install AWS CLI
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+        unzip -o /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install --update
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Start and enable Docker
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create data directory
+      file:
+        path: "{{ data_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Authenticate to ECR
+      shell: >
+        aws ecr get-login-password --region {{ aws_region }} |
+        docker login --username AWS --password-stdin {{ ecr_registry }}
+      changed_when: true
+
+    - name: Pull Minecraft image from ECR
+      community.docker.docker_image:
+        name: "{{ image_name }}"
+        tag: "{{ image_tag }}"
+        source: pull
+        force_source: true
+
+    - name: Restore world data from S3 if backup exists
+      shell: |
+        aws s3 ls s3://{{ s3_bucket }}/world.tar.gz && \
+        aws s3 cp s3://{{ s3_bucket }}/world.tar.gz /tmp/world.tar.gz && \
+        tar -xzf /tmp/world.tar.gz -C {{ data_dir }} || true
+      args:
+        executable: /bin/bash
+
+    - name: Run Minecraft container
+      community.docker.docker_container:
+        name: minecraft
+        image: "{{ image_name }}:{{ image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "25565:25565"
+        volumes:
+          - "{{ data_dir }}:/data"
+        env:
+          EULA: "TRUE"
+          MEMORY: "1G"
+          MOTD: "Kevin Gustafson: 934-499-457"

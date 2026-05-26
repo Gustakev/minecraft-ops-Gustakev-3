@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-config
+data:
+  EULA: "TRUE"
+  MEMORY: "1G"
+  MOTD: "Kevin Gustafson: 934-499-457"
+  TYPE: "VANILLA"

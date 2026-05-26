@@ -11,29 +11,27 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Security group: controls what traffic is allowed in/out
 resource "aws_security_group" "minecraft" {
-  name        = "minecraft-sg"
+  name        = "minecraft-k8s-sg"
   description = "Allow SSH and Minecraft"
   vpc_id      = var.vpc_id
 
-  # SSH: so Ansible can log in and configure the server
   ingress {
+    description = "SSH from known source"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip]
   }
 
-  # Minecraft client port
   ingress {
+    description = "Minecraft"
     from_port   = 25565
     to_port     = 25565
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound traffic (needed to pull from ECR, S3)
   egress {
     from_port   = 0
     to_port     = 0
@@ -42,29 +40,33 @@ resource "aws_security_group" "minecraft" {
   }
 }
 
-# The EC2 instance: the actual server
 resource "aws_instance" "minecraft" {
   ami                         = "ami-05cf1e9f73fbad2e2" # Ubuntu 24.04 LTS us-east-1
-  instance_type               = var.instance_type
+  instance_type               = "t3.medium"             # 4GB RAM: k3s ~500MB + Minecraft ~1.3GB
   subnet_id                   = var.subnet_id
   vpc_security_group_ids      = [aws_security_group.minecraft.id]
   key_name                    = var.key_name
   associate_public_ip_address = true
-
-  # Attach the pre-existing LabInstanceProfile so the server can access ECR and S3
-  iam_instance_profile = "LabInstanceProfile"
+  iam_instance_profile        = "LabInstanceProfile"
 
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
   }
 
+  user_data = templatefile("${path.module}/cloud-init.sh", {
+    ecr_registry = "767398024557.dkr.ecr.us-east-1.amazonaws.com"
+    image_name   = "767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server"
+    image_tag    = "v1.0.0"
+    s3_bucket    = "minecraft-world-767398024557"
+    motd         = "Kevin Gustafson: 934-499-457"
+  })
+
   tags = {
-    Name = "minecraft-server"
+    Name = "minecraft-k8s"
   }
 }
 
-# Output the public IP so we know where to connect
 output "public_ip" {
   value = aws_instance.minecraft.public_ip
 }

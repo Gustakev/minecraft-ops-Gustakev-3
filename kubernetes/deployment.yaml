@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft
+  template:
+    metadata:
+      labels:
+        app: minecraft
+    spec:
+      imagePullSecrets:
+        - name: ecr-secret
+      containers:
+        - name: minecraft
+          image: 767398024557.dkr.ecr.us-east-1.amazonaws.com/minecraft-server:v1.0.0
+          ports:
+            - containerPort: 25565
+          envFrom:
+            - configMapRef:
+                name: minecraft-config
+          startupProbe:
+            tcpSocket:
+              port: 25565
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 25565
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 25565
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "1536Mi"
+              cpu: "1500m"
+          volumeMounts:
+            - name: world-data
+              mountPath: /data
+      volumes:
+        - name: world-data
+          persistentVolumeClaim:
+            claimName: minecraft-world

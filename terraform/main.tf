@@ -42,7 +42,7 @@ resource "aws_security_group" "minecraft" {
 
 resource "aws_instance" "minecraft" {
   ami                         = "ami-05cf1e9f73fbad2e2" # Ubuntu 24.04 LTS us-east-1
-  instance_type               = "t3.medium"             # 4GB RAM: k3s ~500MB + Minecraft ~1.3GB
+  instance_type               = "t3.large"             # 8GB RAM: This provides headroom for k3s, Minecraft, and a monitoring stack
   subnet_id                   = var.subnet_id
   vpc_security_group_ids      = [aws_security_group.minecraft.id]
   key_name                    = var.key_name

@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: minecraft-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: minecraft
+      rules:
+        - alert: MinecraftServerDown
+          expr: minecraft_status_healthy == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Minecraft server is unreachable"
+            description: "The Minecraft server has not responded to status checks for 1 minute. Players cannot connect."
+        - alert: MinecraftPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{pod=~"minecraft.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Minecraft pod is restarting"
+            description: "The Minecraft pod has restarted in the last 15 minutes. Check kubectl logs for details."
+        - alert: NodeMemoryHigh
+          expr: 100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node memory usage above 80%"
+            description: "The EC2 node is using more than 80% of its memory. Risk of OOM kills."

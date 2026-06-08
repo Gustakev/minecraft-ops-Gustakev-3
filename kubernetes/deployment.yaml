@@ -49,6 +49,17 @@ spec:
           volumeMounts:
             - name: world-data
               mountPath: /data
+        - name: mc-monitor
+          image: itzg/mc-monitor
+          args:
+            - export-for-prometheus
+            - -servers
+            - localhost:25565
+            - -port
+            - "8080"
+          ports:
+            - containerPort: 8080
+              name: metrics
       volumes:
         - name: world-data
           persistentVolumeClaim:
